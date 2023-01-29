@@ -1,0 +1,141 @@
+DATA  SEGMENT
+	time_str  DB 3, ?, 3 DUP(?)	;表示键盘输入的表示时间的字符串（单位：秒）
+	time       DB 00H		;表示字符转换后的时间数（单位：秒，最大值为255）
+	flag        DB 0AH		;如果输入的时间不是一位，则：高位*10+低位
+	table      DB    40H, 79H, 24H, 30H, 19H, 12H, 02H, 78H, 00H, 18H    ;0~9的七段数码管换码表
+DATA  ENDS
+CODE SEGMENT
+	ASSUME CS:CODE, DS: DATA
+	INTPORT1 EQU 0FF80H	;8259偶地址口
+	INTPORT2 EQU 0FF81H	;8259奇地址口
+	INTQ3	 EQU INTREEUP3
+	TCONTRO EQU 0043H	;8253的控制口
+	TCON2	EQU 0042H	;8253的计数器2
+	TCON1     EQU 0041H	;8253的计数器1
+	TCON0	EQU 0040H	;8253的计数器0
+	IOCONPT EQU 0FF2BH	;8255的控制口
+	IOCPT      EQU 0FF2AH	;8255的C口
+	IOBPT	EQU 0FF29H	;8255的B口
+	IOAPT	EQU 0FF28H	;8255的A口
+	ORG 12D0H
+
+START:	MOV  AX, DATA
+        	MOV  DS, AX
+	
+	;--------------------------------实现键盘输入时间，并将字符串转换为数字保存在time
+	LEA  DX, time_str
+	MOV  AH, 0AH		;用键盘输入倒计时的时间
+	INT  21H                   	
+	MOV  CL, time_str+1	;将输入的字符串长度给CX
+	MOV  CH, 0
+	LEA  BX, time_str+2        	;字符首地址给BX
+ONE:   	MOV  DL, [BX]             	;取出一个字符
+	INC  BX	                  	;指向下一个字符的地址
+	SUB  DL, 30H		;将字符转换为数字
+	MOV  AL, time
+	MUL  flag			;先将数字的高位*10
+	ADD  AL, DL		;再与低位相加
+	MOV  time, AL		;将新计算出的时间给time
+	LOOP   ONE
+		
+	;-------------------------------用指令方式直接设置8259中断向量
+	CLD			;方向标志清零
+	MOV AX,0H                	;目的地址基址为ES，其值为0
+	MOV ES,AX
+	MOV DI,002CH		;DI←0BH*4，即目的地址偏移量
+	LEA AX,SUB1		;AX←SUB1的偏移地址(IP)
+	STOSW			;(ES:DI)←中断服务程序的偏移地址(IP)
+	MOV AX,SEG SUB1		;AX←SUB1的段地址(CS)
+	STOSW			;(ES:DI)←中断服务程序的段地址(CS)
+
+ 	;--------------------------------8259初始化
+	MOV AL,00010011B               ;ICW1，边沿触发，单级          
+	MOV DX,INTPORT1		;偶端口
+	OUT DX,AL
+	MOV AL,00001000B	;ICW2，中断类型号高5位00001
+	MOV DX,INTPORT2		;奇端口
+	OUT DX,AL
+	MOV AL,00001000B	;ICW4，全嵌套，缓冲方式，非自动结束中断
+	OUT DX,AL		;奇端口
+	MOV AL,11110111B	;OCW1，允许IR3中断，其余位屏蔽
+	OUT DX,AL		;奇端口
+
+	;--------------------------------8255初始化
+	;--------------------------------A口接七段数码管，B口控制扬声器
+	MOV AL,10000000B               ;写入控制字，A、B口方式0输出，C口高低位均输出                 
+	MOV DX,IOCONPT
+	OUT DX,AL
+	MOV AL,0EH		;起初，设置数码管显示"F"
+	MOV DX,IOAPT		;指向A口
+                OUT DX,AL
+	MOV AL,00H		;起初，设置扬声器为"关"
+	MOV DX,IOBPT		;指向B口
+                OUT DX,AL
+                
+	;--------------------------------8253初始化
+	;--------------------------------通道0与通道1级联，CLK0接8MHz，OUT1产生T=1s的方波
+	MOV AL,00110101B	;控制字，通道0，先低字节后高字节，方式2，BCD码		
+	MOV DX,TCONTRO                 ;控制口
+	OUT DX,AL
+	MOV AX,1000H		;计数初值为1000
+	MOV DX,TCON0		;通道0
+	OUT DX,AL		;写低字节
+	MOV AL,AH
+	OUT DX,AL		;写高字节
+	MOV AL,01110111B	;控制字，通道1，先低字节后高字节，方式3，BCD码
+	MOV DX,TCONTRO		;控制口
+	OUT DX,AL
+	MOV AX,8000H		;计数初值为8000
+	MOV DX,TCON1		;通道1
+	OUT DX,AL		;写低字节
+	MOV AL,AH
+	OUT DX,AL		;写高字节
+	MOV AL,10110110B	;控制字，通道2，先低字节后高字节，方式3，二进制
+	MOV DX,TCONTRO		;控制口
+	OUT DX,AL
+	MOV AX,533H		;计数初值为1331=533H
+	MOV DX,TCON2		;通道2
+	OUT DX,AL		;写低字节
+	MOV AL,AH
+	OUT DX,AL		;写高字节
+	
+	STI			;开中断
+
+WAITING1: 		     
+	JMP WAITING1		;
+	RET
+
+	;--------------------------------中断服务程序SUB1
+SUB1:	CLI			;关中断
+	DEC time			;倒计时-1
+
+	CMP time, 09H		;若所剩时间＞9s，则数码管上不显示倒计时
+	JA NotShow		
+	MOV AL, time		;若所剩时间≤9s，则数码管上显示倒计时
+	LEA  BX, table  	      	;BX←table的首地址
+	XLAT			;查表，AL←(BX+AL)         	
+	MOV DX,IOAPT		;指向8255的A口，控制七段数码管显示倒计时
+	OUT DX,AL
+	CMP time, 00H		;若倒计时结束，接通扬声器发出声音
+	JA NotShow
+	CALL  SUB2     		;倒计时结束，调用子程序SUB2，扬声器发声，然后结束
+	
+NotShow:  MOV AL,20H		;用EOI命令结束中断
+	MOV DX,INTPORT1		;给8259偶地址口
+	OUT DX,AL
+	STI			;开中断
+	IRET			;返回主程序
+
+	;--------------------------------子程序SUB2，倒计时结束，扬声器发声，结束
+SUB2:	MOV AL, 03H		;使PB0和PB1均置1
+	MOV DX,IOBPT		;指向8255的B口，控制扬声器发出单一频率(896Hz)的声音
+	OUT DX,AL
+	MOV CX, 20000
+WAITING2:  LOOP WAITING2		;适当延长扬声器的发生
+	MOV AL, 00H		;使PB0和PB1均置0
+	MOV DX,IOBPT		;指向8255的B口，关闭扬声器
+	OUT DX,AL
+	RET
+
+CODE ENDS
+END  START

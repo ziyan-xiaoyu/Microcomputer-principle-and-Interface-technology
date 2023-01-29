@@ -1,0 +1,18 @@
+DATA  SEGMENT
+           X  DW  12345
+DATA  ENDS
+CODE  SEGMENT
+           ASSUME  DS:DATA, CS:CODE
+START:  MOV  AX, DATA
+             MOV  DS, AX
+             MOV  CX, 16
+ONE:     ROL    X, 1
+             MOV  DL, 0
+             ADC   DL, 30H
+             MOV  AH, 2
+             INT     21H
+             LOOP ONE
+             MOV  AX, 4C00H
+             INT   21H
+CODE ENDS
+         END  START

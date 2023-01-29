@@ -1,0 +1,55 @@
+DATA  SEGMENT
+	STR1  DB  20, ?, 20 DUP(?)
+	STR2  DB  20, ?, 20 DUP(?)
+	INDEX  DB  -1
+DATA  ENDS
+CODE  SEGMENT
+	ASSUME  CS: CODE, DS: DATA, ES: DATA
+START:     MOV   AX, DATA
+	MOV   DS, AX
+	MOV   ES, AX
+	LEA      DX, STR1
+	MOV   AH, 0AH
+	INT      21H                #输入字符串到STR1
+	MOV   DL, 0DH
+	MOV   AH, 02H
+	INT      21H
+	MOV   DL, 0AH
+	INT      21H              #输出一个空格换行
+	LEA      DX, STR2
+	MOV   AH, 0AH
+	INT      21H                #输入字符串到STR2（注意与STR1等长）
+	MOV   DL, 0DH
+	MOV   AH, 02H
+	INT      21H
+	MOV   DL, 0AH
+	INT      21H              #再输出一个空格换行
+
+	LEA      SI, STR1+2
+	LEA      DI, STR2+2
+	MOV   CL, STR1+1
+	MOV   CH, 0              #串长度给CX
+	CLD                          #串操作由低地址向高地址方向进行
+	REPZ    CMPSB          #带重复前缀的字符串比较指令
+	JZ        EQUAL           #两个字符串相等，则跳转
+	MOV   BL,  STR1+1
+	SUB     BL, 1
+	SUB     BL, CL
+	MOV   INDEX, BL       #求第一个不相同字符的下标
+	ADD    INDEX, 30H
+	MOV   DL, INDEX
+	MOV   AH, 02H
+	INT      21H               #输出INDEX（表示下标）
+	JMP     DONE            #跳转到结束
+
+EQUAL:    MOV    DL, 2DH
+	MOV    AH, 02H
+	INT       21H
+	MOV    DL, 31H
+	INT       21H              #输出INDEX=-1
+
+DONE:     	MOV    AX, 4C00H
+	INT       21H
+CODE  ENDS
+	END     START
+

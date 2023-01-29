@@ -1,0 +1,24 @@
+DATA  SEGMENT
+	X   DW   0001H
+                Y   DW   ?
+DATA  ENDS
+CODE  SEGMENT
+                ASSUME CS: CODE, DS: DATA
+START:	MOV   AX, DATA
+                MOV   DS, AX
+	MOV   AX, X
+	CMP    AX, -2
+	JGE      L2
+L1:	SUB     AX, 3
+	JMP     DONE		
+L2:	CMP    AX, 3
+	JG        L3
+	ADD    AX, AX
+	ADD    AX, 6
+	JMP     DONE
+L3:	MOV   AX, 2
+DONE: 	MOV   Y, AX
+	MOV   AX, 4C00H
+	INT      21H
+CODE  ENDS
+	END   START

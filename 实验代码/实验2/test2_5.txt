@@ -1,0 +1,31 @@
+DATA  SEGMENT
+	BUF  DW  98, 34, 897, 345, 678, 21345, 67, 2
+	COUNT  EQU  ($-BUF)/2
+	SMAX  DW  ?
+DATA  ENDS
+CODE  SEGMENT
+	ASSUME	CS: CODE, DS: DATA
+START:     MOV       AX, DATA
+	MOV       DS, AX
+	LEA          SI, BUF	         #入口参数SI
+	MOV	CX, COUNT       #入口参数CX
+	CALL	MAX                 #调用子程序MAX
+	MOV       SMAX, BX	         #把出口参数BX的值保存在变量SMAX中		
+	MOV	AH, 4CH
+	INT	21H
+MAX	PROC	 
+	PUSH	SI
+	PUSH       CX                     #保护现场
+	MOV	BX, [SI]
+	DEC	CX
+MAX1:	ADD	SI, 2
+	CMP	BX, [SI]
+	JAE	NEXT
+	MOV	BX, [SI]				
+NEXT:	LOOP	MAX1
+	POP          CX
+	POP          SI                      #恢复现场
+	RET		          #结束子程序		
+MAX	ENDP
+CODE	ENDS
+	END	START

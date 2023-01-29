@@ -1,0 +1,26 @@
+DATA  SEGMENT
+           BUFFER  DB  81, ?, 81 DUP(?)
+DATA  ENDS
+CODE  SEGMENT
+           ASSUME  CS:CODE, DS:DATA
+START:  MOV  AX, DATA
+             MOV  DS, AX
+             LEA    DX, BUFFER
+             MOV  AH, 0AH
+             INT     21H
+             MOV  CL, BUFFER+1
+             MOV  CH, 0			
+             LEA     BX, BUFFER+2
+NEXT:   MOV   AL, [BX]
+             ADD   AL, 'A'-'0'
+             MOV  [BX], AL				
+             INC     BX
+             LOOP  NEXT
+             MOV  BYTE PTR[BX], '$'
+             LEA    DX, BUFFER+2
+             MOV  AH, 09H
+             INT     21H
+             MOV  AX, 4C00H
+             INT     21H
+CODE  ENDS
+            END  START

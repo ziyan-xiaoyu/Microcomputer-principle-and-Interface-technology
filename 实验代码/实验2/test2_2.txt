@@ -1,0 +1,74 @@
+DATA  SEGMENT
+	BUFFER  DB 20, ?, 20 DUP(?)
+	N1   DB  0    #数字字符个数
+	N2   DB  0    #小写字母个数
+	N3   DB  0    #大写字母个数
+	N4   DB  0    #空格个数
+DATA  ENDS
+CODE  SEGMENT
+                ASSUME CS: CODE, DS: DATA
+START:	MOV   AX, DATA
+                MOV   DS, AX
+	LEA     DX, BUFFER
+	MOV   AH, 0AH
+	INT      21H                   #完成字符串的输入
+	MOV   CL, BUFFER+1
+	MOV   CH, 0                 #将循环次数给CX
+	LEA      BX, BUFFER+2  #字符首地址
+ONE:        MOV   DL, [BX]             #取出一个字符
+	INC      BX                     #指向下一个字符的地址
+	CMP    DL, 20H
+	JZ        L4                      #是空格
+	CMP    DL, 61H
+	JAE      L2                      #≥'a'
+	CMP    DL, 41H
+	JAE      L3                      #≥'A'
+	CMP    DL, 30H
+	JB        DONE                #＜'0'
+L1:            CMP   DL, 39H
+	JA       DONE                 #＞'9'
+	INC     N1
+	JMP     DONE
+L2:            CMP   DL, 7AH
+	JA       DONE                 #＞'z'
+	INC     N2
+	JMP     DONE
+L3:            CMP   DL, 5AH
+	JA       DONE                 #＞'Z'
+	INC     N3
+	JMP     DONE
+L4:            INC     N4
+DONE:      LOOP   ONE
+	
+	MOV   DL, 0DH             #输出回车换行
+	MOV   AH, 02H
+	INT      21H
+	MOV   DL, 0AH
+	INT      21H
+
+	ADD    N1, 30H             #输出数字字符个数
+	MOV   DL, N1
+	INT      21H
+	MOV   DL, 20H
+	INT      21H
+
+	ADD    N2, 30H             #输出小写字母个数
+	MOV   DL, N2
+	INT      21H
+	MOV   DL, 20H
+	INT      21H
+
+	ADD    N3, 30H             #输出大写字母个数
+	MOV   DL, N3
+	INT      21H
+	MOV   DL, 20H
+	INT      21H
+
+	ADD    N4, 30H             #输出空格个数
+	MOV   DL, N4
+	INT      21H
+
+	MOV   AX, 4C00H
+	INT      21H
+CODE  ENDS
+	END   START
